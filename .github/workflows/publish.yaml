@@ -23,6 +23,8 @@ jobs:
         include:
           - platform: ubuntu-24.04
             args: ''
+          - platform: ubuntu-24.04-arm
+            args: ''
           - platform: windows-latest
             args: '--bundles msi'
 
@@ -49,7 +51,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-24.04'
+        if: matrix.platform == 'ubuntu-24.04' || matrix.platform == 'ubuntu-24.04-arm'
         run: |
           sudo apt update;
           sudo apt-get install -y libappindicator3-dev librsvg2-dev libudev-dev patchelf \
@@ -60,7 +62,7 @@ jobs:
             gir1.2-javascriptcoregtk-4.1 \
             gir1.2-webkit2-4.1
 
-      - name: Use a linuxdeploy that leaves libwayland-client to the host
+      - name: Use a linuxdeploy that leaves libwayland-client to the host (x64)
         if: matrix.platform == 'ubuntu-24.04'
         run: |
           set -euo pipefail
@@ -70,13 +72,23 @@ jobs:
           echo "c20cd71e3a4e3b80c3483cef793cda3f4e990aca14014d23c544ca3ce1270b4d  $HOME/.cache/tauri/linuxdeploy-x86_64.AppImage" | sha256sum -c
           chmod +x ~/.cache/tauri/linuxdeploy-x86_64.AppImage
 
+      - name: Use a linuxdeploy that leaves libwayland-client to the host (aarch64)
+        if: matrix.platform == 'ubuntu-24.04-arm'
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.cache/tauri
+          curl -fsSL -o ~/.cache/tauri/linuxdeploy-aarch64.AppImage \
+            https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20251107-1/linuxdeploy-aarch64.AppImage
+          echo "620095110d693282b8ebeb244a95b5e911cf8f65f76c88b4b47d16ae6346fcff  $HOME/.cache/tauri/linuxdeploy-aarch64.AppImage" | sha256sum -c
+          chmod +x ~/.cache/tauri/linuxdeploy-aarch64.AppImage
+
       - name: Build Tauri app and upload artifacts
         uses: tauri-apps/tauri-action@v0
         id: tauri
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          #TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          #TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
         with:
           tagName: __VERSION__
           releaseName: '__VERSION__'
@@ -84,7 +96,7 @@ jobs:
           args: ${{ matrix.args }}
 
       - name: Compute AppImage hash
-        if: matrix.platform == 'ubuntu-24.04'
+        if: matrix.platform == 'ubuntu-24.04' || matrix.platform == 'ubuntu-24.04'
         id: hash
         run: |
           SHA256=$(sha256sum src-tauri/target/release/bundle/appimage/*.AppImage | awk '{print $1}')
@@ -112,21 +124,21 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
-      - name: Install Thunderstore CLI
-        run: dotnet tool install -g tcli
+  #    - name: Install Thunderstore CLI
+ #       run: dotnet tool install -g tcli
 
-      - name: Publish to Thunderstore
-        env:
-          TCLI_AUTH_TOKEN: ${{ secrets.THUNDERSTORE_TOKEN }}
-        run: tcli publish --package-version ${{ needs.build.outputs.appVersion }}
+  #    - name: Publish to Thunderstore
+  #      env:
+  #        TCLI_AUTH_TOKEN: ${{ secrets.THUNDERSTORE_TOKEN }}
+   #     run: tcli publish --package-version ${{ needs.build.outputs.appVersion }}
 
-      - name: Update latest.json Github gist
-        uses: exuanbo/actions-deploy-gist@v1
-        with:
-          token: ${{ secrets.GIST_TOKEN }}
-          gist_id: 58b4f08009e7b7b5baaea253ebccb94d
-          gist_description: Auto-updater endpoint for gale
-          file_path: latest.json
+  #    - name: Update latest.json Github gist
+#        uses: exuanbo/actions-deploy-gist@v1
+ #       with:
+#          token: ${{ secrets.GIST_TOKEN }}
+#          gist_id: 58b4f08009e7b7b5baaea253ebccb94d
+ #         gist_description: Auto-updater endpoint for gale
+ #         file_path: latest.json
 
   flatter:
     name: Build Flatpak
